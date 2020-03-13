@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workflow-definition xmlns="urn:liferay.com:liferay-workflow_7.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:liferay.com:liferay-workflow_7.0.0 http://www.liferay.com/dtd/liferay-workflow-definition_7_0_0.xsd">
+    <name>BookingPayment</name>
+    <version>1</version>
+    <state>
+        <name>created</name>
+        <metadata><![CDATA[{"xy":[100,50],"transitions":{"notifications":{"bendpoints":[]}}}]]></metadata>
+        <initial>true</initial>
+        <transitions>
+            <transition>
+                <name>notifications</name>
+                <target>New Task</target>
+                <default>true</default>
+            </transition>
+        </transitions>
+    </state>
+    <state>
+        <name>approved</name>
+        <metadata><![CDATA[{"xy":[780,50],"terminal":true}]]></metadata>
+        <actions>	
+            <action>
+                <name>approve</name>
+                <script><![CDATA[
+						import com.liferay.portal.kernel.workflow.WorkflowStatusManagerUtil;
+						import com.liferay.portal.kernel.workflow.WorkflowConstants;
+
+						WorkflowStatusManagerUtil.updateStatus(WorkflowConstants.getLabelStatus("approved"), workflowContext);
+				]]></script>
+                <script-language>groovy</script-language>
+                <execution-type>onEntry</execution-type>
+            </action>
+        </actions>
+    </state>
+    <task>
+        <name>New Task</name>
+        <metadata><![CDATA[{"xy":[430,35],"transitions":{"approved":{"bendpoints":[]}}}]]></metadata>
+        <actions>
+            <action>
+                <name>Email to User</name>
+                <script><![CDATA[import java.util.Map;
+import java.io.Serializable;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.AddressException;
+import com.liferay.mail.kernel.model.MailMessage;
+import com.liferay.mail.kernel.service.MailServiceUtil;
+import com.liferay.portal.kernel.util.GetterUtil;
+import com.liferay.dynamic.data.lists.model.DDLRecord;
+import com.liferay.dynamic.data.lists.service.DDLRecordLocalServiceUtil;
+import com.liferay.dynamic.data.lists.model.DDLRecordVersion;
+import com.liferay.portal.kernel.util.GetterUtil;
+import com.liferay.portal.kernel.workflow.WorkflowConstants;
+
+long classPK = GetterUtil.getLong((String) workflowContext.get(WorkflowConstants.CONTEXT_ENTRY_CLASS_PK));    
+DDLRecordVersion ddlRecordVersion = DDLRecordLocalServiceUtil.getRecordVersion(classPK);
+long ddlRecordId = ddlRecordVersion.getRecordId();
+
+InternetAddress fromAddress = null;
+InternetAddress toAddress = null;
+
+Map<String, Serializable> attributes = serviceContext.getAttributes();
+String emailTo = "";
+for(String key: attributes.keySet()) {
+	if(key.startsWith("Email")) {
+		emailTo = attributes.get(key);
+	}
+}
+
+try {
+		fromAddress = new InternetAddress("info@hotelpuntaleona.com");
+		toAddress = new InternetAddress(emailTo);
+		MailMessage mailMessage = new MailMessage();
+		mailMessage.setTo(toAddress);
+		mailMessage.setFrom(fromAddress);
+		mailMessage.setHTMLFormat(true);
+		
+		mailMessage.setSubject("Nueva reservación");
+		mailMessage.setBody("Puede realizar el pago de su reservación <a href='http://localhost:8080/web/guest/pagar?reservation=" + ddlRecordId + "'> Aquí</a>");
+		MailServiceUtil.sendEmail(mailMessage);
+
+} catch (AddressException e) {
+	e.printStackTrace();
+}
+
+]]></script>
+                <script-language>groovy</script-language>
+                <execution-type>onEntry</execution-type>
+            </action>
+            <action>
+                <name>Change Status</name>
+                <script><![CDATA[
+						import com.liferay.portal.kernel.workflow.WorkflowStatusManagerUtil;
+						import com.liferay.portal.kernel.workflow.WorkflowConstants;
+
+						WorkflowStatusManagerUtil.updateStatus(WorkflowConstants.getLabelStatus("approved"), workflowContext);
+]]></script>
+                <script-language>groovy</script-language>
+                <execution-type>onEntry</execution-type>
+            </action>
+        </actions>
+        <assignments>
+            <scripted-assignment>
+                <script><![CDATA[returnValue = 100; roles=null;user=null]]></script>
+                <script-language>groovy</script-language>
+            </scripted-assignment>
+        </assignments>
+        <transitions>
+            <transition>
+                <name>approved</name>
+                <target>approved</target>
+            </transition>
+        </transitions>
+    </task>
+</workflow-definition>
